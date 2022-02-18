@@ -1,0 +1,4 @@
+[submodule "gttools"]
+	path = gttools
+	url = https://github.com/CookiePLMonster/GTModTools.git
+	branch = master
