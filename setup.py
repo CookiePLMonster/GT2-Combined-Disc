@@ -7,11 +7,16 @@ import io
 import sys
 import argparse
 import re
+import xml.etree.ElementTree as ET
 from gttools import ovl, PSEXE
+
+DEFAULT_OUTPUT_NAME = 'GT2Combined.bin'
 
 parser = argparse.ArgumentParser(description='Gran Turismo 2 Combined Disc install script. Running the script without any arguments will start Interactive Mode.')
 parser.add_argument('-a', '--arcade-disc', type=str, dest='arcade_path', help='path to the Arcade Mode disc')
 parser.add_argument('-s', '--simulation-disc', type=str, dest='sim_path', help='path to the Simulation Mode disc')
+parser.add_argument('-o', '--output', type=str, dest='output_file', default=DEFAULT_OUTPUT_NAME, help='name of the output file (default: %(default)s)')
+parser.add_argument('-e', '--ignore-errors', dest='ignore_errors', action='store_true', help='ignore non-critical errors encountered during setup. Critical errors are never ignored')
 
 args = parser.parse_args()
 
@@ -67,6 +72,9 @@ def main():
         if interactive_mode:
             if not getYesNoAnswer('Continue anyway?'):
                 sys.exit('Setup aborted by user')
+        else:
+            if not args.ignore_errors:
+                sys.exit('Setup aborted due to an error')
 
     # GZIP stuff
 
@@ -109,12 +117,17 @@ def main():
     MKPSXISO_PATH = os.path.realpath('tools/mkpsxiso')
     GTVOLTOOL_PATH = os.path.realpath('tools/GTVolTool')
 
+    XML_NAME = 'files.xml'
+    DISC_MODIFIED_TIMESTAMP = "2022022000000000+0"
+
     if interactive_mode:
         arcade_path = getInputPath('Input the path to GT2 Arcade Disc:')
         sim_path = getInputPath('Input the path to GT2 Simulation Disc:')
+        output_file = input(f'Input the name of the output file (default: {DEFAULT_OUTPUT_NAME}): ') or DEFAULT_OUTPUT_NAME
     else:
         arcade_path = args.arcade_path
         sim_path = args.sim_path
+        output_file = args.output_file
 
     with tempfile.TemporaryDirectory(prefix='gt2combined-', ignore_cleanup_errors=True) as temp_dir:
 
@@ -124,11 +137,11 @@ def main():
             try:
                 print('Unpacking the Arcade Mode disc...')
                 arcade_dest = os.path.join(temp_dir, 'disc1')
-                subprocess.run([dumpsxiso_exe_path, arcade_path, '-x', arcade_dest, '-s', os.path.join(arcade_dest, 'files.xml')], check=True)
+                subprocess.run([dumpsxiso_exe_path, arcade_path, '-x', arcade_dest, '-s', os.path.join(arcade_dest, XML_NAME)], check=True)
 
                 print('Unpacking the Simulation Mode disc...')
                 sim_dest = os.path.join(temp_dir, 'disc2')
-                subprocess.run([dumpsxiso_exe_path, sim_path, '-x', sim_dest, '-s', os.path.join(sim_dest, 'files.xml')], check=True)
+                subprocess.run([dumpsxiso_exe_path, sim_path, '-x', sim_dest, '-s', os.path.join(sim_dest, XML_NAME)], check=True)
 
             except subprocess.CalledProcessError as e:
                 sys.exit(f'Unpacking discs failed with error {e.returncode}!')
@@ -151,7 +164,17 @@ def main():
                 sys.exit('Could not determine the disc types after unpacking! Did you unpack correct Arcade and Simulation discs?')
             return real_arcade_path, real_sim_path
 
-        def unpackVOL(path):
+        def stepPackDisc(path):
+            print('Packing the combined disc...')
+            try:
+                arguments = [os.path.join(MKPSXISO_PATH, 'mkpsxiso'), os.path.join(path, XML_NAME)]
+                if not interactive_mode:
+                    arguments.append('-y')
+                subprocess.run(arguments)
+            except subprocess.CalledProcessError as e:
+                sys.exit(f'Packing the disc failed with error {e.returncode}!')
+
+        def stepUnpackVOL(path):
             print('Unpacking GT2.VOL from the Simulation Mode disc...')
             try:
                 output_dir = os.path.join(path, 'vol')
@@ -160,12 +183,61 @@ def main():
             except subprocess.CalledProcessError as e:
                 sys.exit(f'Unpacking GT2.VOL failed with error {e.returncode}!')
 
-        def unpackOVL(path):
+        def stepPackVOL(path, vol_files):
+            print('Packing GT2.VOL...')
+            try:
+                subprocess.run([os.path.join(GTVOLTOOL_PATH, "GTVolTool"), '-r2', vol_files, os.path.join(path, 'GT2.VOL')])
+            except subprocess.CalledProcessError as e:
+                sys.exit(f'Packing GT2.VOL failed with error {e.returncode}!')
+
+        def stepUnpackOVL(path):
             print('Unpacking GT2.OVL from the Simulation Mode disc...')
 
             output_dir = os.path.join(path, 'ovl')
             ovl.unpack(os.path.join(path, 'GT2.OVL'), output_dir)
             return output_dir
+
+        def stepPackOVL(path, ovl_files):
+            print('Packing GT2.OVL...')
+
+            files_to_pack = [os.path.join(ovl_files, f'gt2_{(x+1):02}.exe') for x in range(6)]
+            ovl.pack(files_to_pack, os.path.join(path, 'GT2.OVL'))
+
+        def stepMergeXMLs(arcade_path, sim_path, output_file):
+            print('Modifying the XML file...')
+
+            arcade_xml = os.path.join(arcade_path, XML_NAME)
+            sim_xml = os.path.join(sim_path, XML_NAME)
+            try:
+                arcade_tree = ET.parse(arcade_xml)
+                sim_tree = ET.parse(sim_xml)
+
+                arcade_project = arcade_tree.getroot()
+                sim_project = sim_tree.getroot()
+
+                sim_project.set('image_name', os.path.splitext(output_file)[0] + '.bin')
+                sim_project.set('cue_sheet', os.path.splitext(output_file)[0] + '.cue')
+
+                arcade_data_track = arcade_project.find("./track[@type='data']")
+                sim_data_track = sim_project.find("./track[@type='data']")
+
+                sim_identifiers = sim_data_track.find('identifiers')
+                sim_identifiers.set('modification_date', DISC_MODIFIED_TIMESTAMP)
+
+                arcade_streams = arcade_data_track.find("./directory_tree/file[@source='STREAM.DAT']")
+                sim_faulty = sim_data_track.find("./directory_tree/file[@source='FAULTY.PSX']")
+
+                sim_faulty.text = arcade_streams.text
+                sim_faulty.attrib = arcade_streams.attrib
+
+                # STREAMS.DAT needs an absolute path
+                sim_faulty.set('source', os.path.join(arcade_path, sim_faulty.get('source')))
+
+                sim_tree.write(sim_xml)
+            except ET.ParseError as e:
+                sys.exit(f'XML parse failure: {e}')
+            except (AttributeError, TypeError): # If any of the .find calls return None
+                sys.exit('XML parse failure')
 
         def patchTXD(path):
             try:
@@ -186,14 +258,16 @@ def main():
             except OSError:
                 raise SetupStepFailedError()
 
-        def patchRaceTXD(path):
+        def stepPatchRaceTXD(path):
+            print('Patching data-race.txd...')
             try:
                 patchTXD(os.path.join(path, '.text', 'data-race.txd'))
             except SetupStepFailedError:
                 eprint('Patching data-race.txd failed!')
                 handleOptionalStepFailure()
 
-        def patchArcadeTXD(path):
+        def stepPatchArcadeTXD(path):
+            print('Patching data-arcade.txd inside gt2_03.exe...')
             try:
                 arcade_overlay_path = os.path.join(path, 'gt2_03.exe')
                 data_to_append = bytearray()
@@ -218,7 +292,7 @@ def main():
 
                         with open(txd_path, 'rb') as f:
                             data = f.read()
-                        
+
                         compressed_data = gzipCompressWithFilename(data, txd_filename)
                         # If compressed data is larger than the original, try again with filename stripped
                         if len(compressed_data) > orig_gzip_size:
@@ -238,7 +312,7 @@ def main():
                     finally:
                         # Explicitly release references to the map
                         data_arcade_gzip_ptr = None
-                
+
                 # If there is any data to append, do so
                 if len(data_to_append) > 0:
                     with open(arcade_overlay_path, 'ab') as f:
@@ -250,14 +324,18 @@ def main():
 
         # Those all call sys.exit on failure
         arcade_files, sim_files = stepUnpackDiscs()
-        vol_files = unpackVOL(sim_files)
-        ovl_files = unpackOVL(sim_files)
 
-        # File patching
-        patchRaceTXD(vol_files) # Optional step
+        vol_files = stepUnpackVOL(sim_files)
+        ovl_files = stepUnpackOVL(sim_files)
 
-        # OVL patching
-        patchArcadeTXD(ovl_files) # Optional step
+        stepMergeXMLs(arcade_files, sim_files, output_file)
+
+        stepPatchRaceTXD(vol_files) # Optional step
+        stepPatchArcadeTXD(ovl_files) # Optional step
+
+        stepPackOVL(sim_files, ovl_files)
+        stepPackVOL(sim_files, vol_files)
+        stepPackDisc(sim_files)
 
         os._exit(0) # Tmp
 
