@@ -1,14 +1,17 @@
+#!/usr/bin/python3
+from gttools import ovl, PSEXE
+from array import array
+import argparse
 import gzip
+import io
+import os
+import re
+import shutil
 import struct
 import subprocess
-import tempfile
-import os
-import io
 import sys
-import argparse
-import re
+import tempfile
 import xml.etree.ElementTree as ET
-from gttools import ovl, PSEXE
 
 DEFAULT_OUTPUT_NAME = 'GT2Combined.bin'
 
@@ -22,13 +25,13 @@ args = parser.parse_args()
 
 interactive_mode = len(sys.argv) == 1
 
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
 def main():
     # Utils
     class SetupStepFailedError(ValueError):
         pass
-
-    def eprint(*args, **kwargs):
-        print(*args, file=sys.stderr, **kwargs)
 
     def getInputPath(prompt):
         import shlex
@@ -42,7 +45,7 @@ def main():
             result = os.path.realpath(display_path)
             if os.path.isfile(result):
                 return result
-            print(f'{display_path} is not a valid file!')
+            print(f'{display_path!r} is not a valid file!')
 
     def getYesNoAnswer(prompt):
         # Copied from distutils.util since it's deprecated in 3.10 and will be removed in 3.12
@@ -58,7 +61,7 @@ def main():
             elif val in ('n', 'no', 'f', 'false', 'off', '0'):
                 return 0
             else:
-                raise ValueError("invalid truth value %r" % (val,))
+                raise ValueError(f"invalid truth value {val!r}")
 
         while True:
             user_input = input(prompt + ' [y/n]: ')
@@ -71,10 +74,10 @@ def main():
         # TODO: Commandline argument to ignore errors if running non-interactive
         if interactive_mode:
             if not getYesNoAnswer('Continue anyway?'):
-                sys.exit('Setup aborted by user')
+                sys.exit('Setup aborted by user.')
         else:
             if not args.ignore_errors:
-                sys.exit('Setup aborted due to an error')
+                sys.exit('Setup aborted due to an error.')
 
     # GZIP stuff
 
@@ -98,7 +101,7 @@ def main():
 
             # data_slice is a valid gzip file, get the size and try to extract the filename if it exists!
             filename = None
-            flags, = struct.unpack_from('B', data_slice, 3)
+            flags, = struct.unpack_from('<B', data_slice, 3)
             if flags & 8: # FNAME
                 name_offset = 10
                 if flags & 4: # FEXTRA
@@ -113,9 +116,17 @@ def main():
             f.write(data)
         return buf.getvalue()
 
+    # Patching stuff
+    def getPattern(exe, pattern, offset=0):
+        for match in re.finditer(pattern, exe.map):
+            return exe.vaddr(match.start()) + offset
+        return None
+
     # Set up paths
     MKPSXISO_PATH = os.path.realpath('tools/mkpsxiso')
     GTVOLTOOL_PATH = os.path.realpath('tools/GTVolTool')
+    VOL_REPLACEMENTS_PATH = os.path.realpath('vol_replacements')
+    MENU_ENTRIES_PATH = os.path.realpath('menu_entries')
 
     XML_NAME = 'files.xml'
     DISC_MODIFIED_TIMESTAMP = "2022022000000000+0"
@@ -235,9 +246,136 @@ def main():
 
                 sim_tree.write(sim_xml)
             except ET.ParseError as e:
-                sys.exit(f'XML parse failure: {e}')
+                sys.exit(f'XML parse failure: {e}.')
             except (AttributeError, TypeError): # If any of the .find calls return None
-                sys.exit('XML parse failure')
+                sys.exit('XML parse failure.')
+
+        def stepPatchEboot(path):
+            print('Patching the boot executable...')
+            try:
+                # "Support" all regions by reading SYSTEM.CNF
+                with open(os.path.join(path, 'SYSTEM.CNF'), 'r') as f:
+                    cnf = {}
+                    for line in f:
+                        key, value = line.split('=', 1)
+                        cnf[key.strip()] = value.strip()
+                eboot_name = cnf['BOOT'].removeprefix('cdrom:\\').rsplit(';', 1)[0]
+                with PSEXE(os.path.join(path, eboot_name), readonly=False) as exe:
+                    # Replace li $a0, 1 with 5li $a0, 5 in sub_8005D6E0 to re-enable intro videos
+                    if immediate := getPattern(exe, rb'\x00\x00\x00\x00.{4}\x01\x00\x04\x24\x10\x00\xBF\x8F', 8): # Pointer to \x01
+                        exe.writeU16(immediate, 5)
+                    else: # No matches
+                        sys.exit(f'Failed to locate code patterns in {eboot_name}. Your game version may be unsupported.')
+
+            except (OSError, KeyError, IndexError):
+                sys.exit('Failed to patch the boot executable!')
+
+        def stepPatchMainMenuOverlay(path):
+            print('Patching gt2_02.exe (main menu overlay)...')
+            try:
+                main_menu_overlay_path = os.path.join(path, 'gt2_02.exe')
+                data_to_append = bytearray()
+                with PSEXE(main_menu_overlay_path, readonly=False, headless=True, baseAddress=0x80010000) as exe:
+                    added_data_vaddr_cursor = exe.vaddr(exe.map.size())
+
+                    if menu_actions_process := getPattern(exe, rb'\x00\x00\x00\x00\x07\x00\x62\x2C', 4):
+                        exe.writeU16(menu_actions_process, 8)
+
+                        # Get the jump table ptr
+                        menu_actions_jump_table_ptr = exe.readIndirectPtr(menu_actions_process+8, menu_actions_process+12)
+                        # Before writing anything, read the original pointers as needed...
+                        menu_action0_ptr = exe.readAddress(menu_actions_jump_table_ptr)
+                        menu_action_attr_ptr_hi, menu_action_attr_ptr_lo = exe.readU32(menu_action0_ptr+4), exe.readU32(menu_action0_ptr+8)
+                        menu_action_jal = exe.readU32(menu_action0_ptr+24)
+                        menu_action_j = exe.readU32(menu_action0_ptr+32)
+
+                        # Now assemble the code
+                        menu_action7 = bytearray()
+                        menu_action7.extend(b'\x02\x00\x04\x24') # li $a0, 2
+                        menu_action7.extend(struct.pack('<II', menu_action_attr_ptr_hi, menu_action_attr_ptr_lo)) # la $v0, byte_801EF5F0
+                        menu_action7.extend(b'\x01\x00\x03\x24') # li $v1, 1
+                        menu_action7.extend(b'\x01\x00\x43\xA0') # sb $v1, 1($v0)
+                        menu_action7.extend(struct.pack('<I', menu_action_jal)) # jal sub_8005DA3C
+                        menu_action7.extend(b'\x02\x00\x43\xA0') # sb $v1, 2($v0)
+                        menu_action7.extend(struct.pack('<I', menu_action_j)) # j def_800114CC
+                        menu_action7.extend(b'\x00' * 4) # nop
+
+                        data_to_append.extend(menu_action7)
+                        exe.writeAddress(menu_actions_jump_table_ptr + 7*4, added_data_vaddr_cursor)
+                        added_data_vaddr_cursor += len(menu_action7)
+                    else:
+                        raise SetupStepFailedError
+
+                    if menu_actions_ptr := getPattern(exe, rb'.{2}\x02\x3C.{2}\x42\x24\x40\x18\x11\x00\x21\x18\x62\x00'):
+                        menu_actions_off = exe.addr(exe.readIndirectPtr(menu_actions_ptr, menu_actions_ptr+4))
+                        struct.pack_into('<9h', exe.map, menu_actions_off, -1, 7, 0, 1, 2, 3, 4, 5, -1)
+                    else:
+                        raise SetupStepFailedError
+
+                    if draw_menu_entries := getPattern(exe, rb'\x21\x20\x00\x02.{2}\x05\x3C.{6}\xA5\x24.{2}\x04\x3C.{2}\x84\x24\x80\x28\x12\x00'):
+
+                        # Relocate 0x20800F
+                        unk_menu_defs_off = exe.addr(exe.readIndirectPtr(draw_menu_entries+4, draw_menu_entries+12))
+                        unk_menu_defs = exe.map[unk_menu_defs_off:unk_menu_defs_off+4]
+                        data_to_append.extend(unk_menu_defs)
+                        exe.writeIndirectPtr(draw_menu_entries+4, draw_menu_entries+12, added_data_vaddr_cursor)
+                        added_data_vaddr_cursor += len(unk_menu_defs)
+
+                        # Expand and move the textures array
+                        main_menu_textures_off = exe.addr(exe.readIndirectPtr(draw_menu_entries+28, draw_menu_entries+32))
+                        main_menu_textures_off += 2
+                        exe.writeIndirectPtr(draw_menu_entries+28, draw_menu_entries+32, exe.vaddr(main_menu_textures_off))
+                        struct.pack_into('<9h', exe.map, main_menu_textures_off, 0, 0, 1, 2, 3, 4, 5, 6, 0)
+
+                        # Expand and move the main menu definitions
+                        # We change an array of 7 langs x 6 entries to 6 langs x 7 entries + 7th language gets appended
+                        def readMenuDefinitions(file):
+                            with open(os.path.join(MENU_ENTRIES_PATH, file + '.bin'), 'rb') as f:
+                                return f.read()
+
+                        menu_item_definitions_array_ptr = exe.readIndirectPtr(draw_menu_entries+16, draw_menu_entries+20)
+                        menu_item_definitions_buffer_offset = exe.addr(exe.readAddress(menu_item_definitions_array_ptr))
+
+                        # Misc (Data Transfer box) comes directly before menu_item_definitions_buffer
+                        exe.map[menu_item_definitions_buffer_offset-12:menu_item_definitions_buffer_offset] = readMenuDefinitions('misc')
+                        for lang in ('jp', 'en-us', 'en-uk', 'fr', 'it', 'de'):
+                            exe.map[menu_item_definitions_buffer_offset:menu_item_definitions_buffer_offset + (7*12)] = readMenuDefinitions(lang)
+                            exe.writeAddress(menu_item_definitions_array_ptr, exe.vaddr(menu_item_definitions_buffer_offset))
+
+                            menu_item_definitions_array_ptr += 4
+                            menu_item_definitions_buffer_offset += 7*12
+
+                        data_to_append.extend(readMenuDefinitions('es'))
+                        exe.writeAddress(menu_item_definitions_array_ptr, added_data_vaddr_cursor)
+                        added_data_vaddr_cursor += 7*12
+                    else:
+                        raise SetupStepFailedError
+
+                    if num_menu_entries_ptr := getPattern(exe, rb'.{2}\x03\x3C.{2}\x10\x3C.{2}\x10\x26\x21\x20\x00\x02', 4):
+                        num_menu_entries = exe.readIndirectPtr(num_menu_entries_ptr, num_menu_entries_ptr+4)
+                        exe.writeU16(num_menu_entries, 9)
+                    else:
+                        raise SetupStepFailedError
+
+                    if num_menu_clamp := getPattern(exe, rb'\x06\x00\x06\x24\xFD\xFF\x02\x24'):
+                        exe.writeU16(num_menu_clamp, 7)
+                    else:
+                        raise SetupStepFailedError
+
+                # If there is any data to append, do so
+                if len(data_to_append) > 0:
+                    with open(main_menu_overlay_path, 'ab') as f:
+                        f.write(data_to_append)
+
+            except (OSError, IndexError, SetupStepFailedError):
+                sys.exit('Failed to patch gt2_02.exe!')
+
+        def stepReplaceCoreVOLFiles(path):
+            print("Replacing core VOL files... Those files are replaced even if they don't match the originals.")
+            try:
+                shutil.copytree(os.path.join(VOL_REPLACEMENTS_PATH, 'core'), path, dirs_exist_ok=True)
+            except shutil.Error:
+                sys.exit('Failed to replace core VOL files!')
 
         def patchTXD(path):
             try:
@@ -251,7 +389,7 @@ def main():
                     search_pattern = replacement[0].ljust(replacement[1], b'\0')
                     replace_pattern = replacement[2].ljust(replacement[1], b'\0')
 
-                    buf = buf.replace(search_pattern, replace_pattern)
+                    buf = buf.replace(search_pattern, replace_pattern, 1)
 
                 with open(path, 'wb') as f:
                     f.write(buf)
@@ -267,59 +405,52 @@ def main():
                 handleOptionalStepFailure()
 
         def stepPatchArcadeTXD(path):
-            print('Patching data-arcade.txd inside gt2_03.exe...')
+            print('Patching data-arcade.txd inside gt2_03.exe (arcade mode overlay)...')
             try:
                 arcade_overlay_path = os.path.join(path, 'gt2_03.exe')
                 data_to_append = bytearray()
                 with PSEXE(arcade_overlay_path, readonly=False, headless=True, baseAddress=0x80010000) as exe:
-                    try:
-                        for match in re.finditer(rb'.{2}\x04\x3C.{2}\x84\x24', exe.map):
-                            data_arcade_gzip_ptr = exe.vaddr(match.start())
-                            vaddr = exe.readIndirectPtr(data_arcade_gzip_ptr, data_arcade_gzip_ptr+4)
+                    if data_arcade_gzip_ptr := getPattern(exe, rb'.{2}\x04\x3C.{2}\x84\x24'):
+                        vaddr = exe.readIndirectPtr(data_arcade_gzip_ptr, data_arcade_gzip_ptr+4)
 
-                            orig_gzip_location = exe.addr(vaddr)
-                            data, orig_gzip_size, orig_gzip_filename = gzipDecompressBruteforce(exe.map[orig_gzip_location:])
-                            break
-                        else: # No matches
-                            raise SetupStepFailedError
+                        orig_gzip_location = exe.addr(vaddr)
+                        data, orig_gzip_size, orig_gzip_filename = gzipDecompressBruteforce(exe.map[orig_gzip_location:])
+                    else: # No matches
+                        raise SetupStepFailedError
 
-                        txd_filename = orig_gzip_filename if orig_gzip_filename else 'data-arcade.txd'
-                        txd_path = os.path.join(path, txd_filename)
-                        with open(txd_path, 'wb') as f:
-                            f.write(data)
+                    txd_filename = orig_gzip_filename if orig_gzip_filename else 'data-arcade.txd'
+                    txd_path = os.path.join(path, txd_filename)
+                    with open(txd_path, 'wb') as f:
+                        f.write(data)
 
-                        patchTXD(txd_path)
+                    patchTXD(txd_path)
 
-                        with open(txd_path, 'rb') as f:
-                            data = f.read()
+                    with open(txd_path, 'rb') as f:
+                        data = f.read()
 
-                        compressed_data = gzipCompressWithFilename(data, txd_filename)
-                        # If compressed data is larger than the original, try again with filename stripped
-                        if len(compressed_data) > orig_gzip_size:
-                            compressed_data = gzip.compress(data)
+                    compressed_data = gzipCompressWithFilename(data, txd_filename)
+                    # If compressed data is larger than the original, try again with filename stripped
+                    if len(compressed_data) > orig_gzip_size:
+                        compressed_data = gzip.compress(data)
 
-                        # Wipe the original gzip location before overwriting or appending
-                        exe.map[orig_gzip_location:orig_gzip_location+orig_gzip_size] = b'\0' * orig_gzip_size
-                        if len(compressed_data) > orig_gzip_size:
-                            # Append
-                            vaddr = exe.vaddr(exe.map.size())
-                            exe.writeIndirectRef(data_arcade_gzip_ptr, data_arcade_gzip_ptr+4, vaddr)
-                            data_to_append.extend(compressed_data)
-                        else:
-                            # Replace
-                            exe.map[orig_gzip_location:orig_gzip_location+len(compressed_data)] = compressed_data
-
-                    finally:
-                        # Explicitly release references to the map
-                        data_arcade_gzip_ptr = None
+                    # Wipe the original gzip location before overwriting or appending
+                    exe.map[orig_gzip_location:orig_gzip_location+orig_gzip_size] = b'\0' * orig_gzip_size
+                    if len(compressed_data) > orig_gzip_size:
+                        # Append
+                        vaddr = exe.vaddr(exe.map.size())
+                        exe.writeIndirectPtr(data_arcade_gzip_ptr, data_arcade_gzip_ptr+4, vaddr)
+                        data_to_append.extend(compressed_data)
+                    else:
+                        # Replace
+                        exe.map[orig_gzip_location:orig_gzip_location+len(compressed_data)] = compressed_data
 
                 # If there is any data to append, do so
                 if len(data_to_append) > 0:
                     with open(arcade_overlay_path, 'ab') as f:
                         f.write(data_to_append)
 
-            except (OSError, SetupStepFailedError):
-                eprint('Patching data-arcade.txd in the arcade overlay failed!')
+            except (OSError, IndexError, SetupStepFailedError):
+                eprint('Patching data-arcade.txd inside gt2_03.exe failed!')
                 handleOptionalStepFailure()
 
         # Those all call sys.exit on failure
@@ -330,6 +461,10 @@ def main():
 
         stepMergeXMLs(arcade_files, sim_files, output_file)
 
+        stepPatchEboot(sim_files)
+        stepPatchMainMenuOverlay(ovl_files)
+        stepReplaceCoreVOLFiles(vol_files)
+
         stepPatchRaceTXD(vol_files) # Optional step
         stepPatchArcadeTXD(ovl_files) # Optional step
 
@@ -337,10 +472,10 @@ def main():
         stepPackVOL(sim_files, vol_files)
         stepPackDisc(sim_files)
 
-        os._exit(0) # Tmp
-
 try:
     main()
-finally:
-    if interactive_mode:
-        input('Press any key to exit...')
+except BaseException as e:
+    eprint(e)
+
+if interactive_mode:
+    input('Press any key to exit...')
