@@ -163,16 +163,18 @@ def main():
 
             if os.path.isfile(os.path.join(arcade_dest, 'STREAM.DAT')):
                 real_arcade_path = arcade_dest
-            elif os.path.isfile(os.path.join(sim_dest, 'STREAM.DAT')):
-                real_arcade_path = sim_dest
-
-            if os.path.isfile(os.path.join(arcade_dest, 'FAULTY.PSX')):
+            else:
                 real_sim_path = arcade_dest
-            elif os.path.isfile(os.path.join(sim_dest, 'FAULTY.PSX')):
+            
+            if os.path.isfile(os.path.join(sim_dest, 'STREAM.DAT')):
+                real_arcade_path = sim_dest
+            else:
                 real_sim_path = sim_dest
 
             if real_arcade_path is None or real_sim_path is None:
                 sys.exit('Could not determine the disc types after unpacking! Did you unpack correct Arcade and Simulation discs?')
+            if real_arcade_path == real_sim_path:
+                sys.exit('Both discs contain STREAM.DAT! Did you unpack correct Arcade and Simulation discs?')
             return real_arcade_path, real_sim_path
 
         def stepPackDisc(path):
@@ -471,6 +473,8 @@ def main():
         stepPackOVL(sim_files, ovl_files)
         stepPackVOL(sim_files, vol_files)
         stepPackDisc(sim_files)
+
+        print('Setup completed successfully!')
 
 try:
     main()
