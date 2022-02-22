@@ -165,7 +165,7 @@ def main():
                 real_arcade_path = arcade_dest
             else:
                 real_sim_path = arcade_dest
-            
+
             if os.path.isfile(os.path.join(sim_dest, 'STREAM.DAT')):
                 real_arcade_path = sim_dest
             else:
@@ -340,7 +340,7 @@ def main():
 
                         # Misc (Data Transfer box) comes directly before menu_item_definitions_buffer
                         exe.map[menu_item_definitions_buffer_offset-12:menu_item_definitions_buffer_offset] = readMenuDefinitions('misc')
-                        for lang in ('jp', 'en-us', 'en-uk', 'fr', 'it', 'de'):
+                        for lang in ('jp', 'en-us', 'en-uk', 'fr', 'de', 'it'):
                             exe.map[menu_item_definitions_buffer_offset:menu_item_definitions_buffer_offset + (7*12)] = readMenuDefinitions(lang)
                             exe.writeAddress(menu_item_definitions_array_ptr, exe.vaddr(menu_item_definitions_buffer_offset))
 
@@ -474,7 +474,7 @@ def main():
         stepPackVOL(sim_files, vol_files)
         stepPackDisc(sim_files)
 
-        print('Setup completed successfully!')
+    print('Setup completed successfully!')
 
 try:
     main()
