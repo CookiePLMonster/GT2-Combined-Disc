@@ -32,6 +32,9 @@ if not cur_python_version >= required_python_version:
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+def getResourcePath(path):
+    return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
+
 def main():
     # Utils
     class SetupStepFailedError(ValueError):
@@ -46,7 +49,7 @@ def main():
                 path = input(prompt + ' ')
 
             display_path = shlex.split(path)[0]
-            result = os.path.realpath(display_path)
+            result = getResourcePath(display_path)
             if os.path.isfile(result):
                 return result
             print(f'{display_path!r} is not a valid file!')
@@ -127,10 +130,10 @@ def main():
         return None
 
     # Set up paths
-    MKPSXISO_PATH = os.path.realpath('tools/mkpsxiso')
-    GTVOLTOOL_PATH = os.path.realpath('tools/GTVolTool')
-    VOL_REPLACEMENTS_PATH = os.path.realpath('vol_replacements')
-    MENU_ENTRIES_PATH = os.path.realpath('menu_entries')
+    MKPSXISO_PATH = getResourcePath('tools/mkpsxiso')
+    GTVOLTOOL_PATH = getResourcePath('tools/GTVolTool')
+    VOL_REPLACEMENTS_PATH = getResourcePath('vol_replacements')
+    MENU_ENTRIES_PATH = getResourcePath('menu_entries')
 
     XML_NAME = 'files.xml'
     DISC_MODIFIED_TIMESTAMP = "2022022000000000+0"
@@ -138,7 +141,7 @@ def main():
     if interactive_mode:
         arcade_path = getInputPath('Input the path to GT2 Arcade Disc:')
         sim_path = getInputPath('Input the path to GT2 Simulation Disc:')
-        output_file = input(f'Input the name of the output file (default: {DEFAULT_OUTPUT_NAME}): ') or DEFAULT_OUTPUT_NAME
+        output_file = getResourcePath(input(f'Input the name of the output file (default: {DEFAULT_OUTPUT_NAME}): ') or DEFAULT_OUTPUT_NAME)
     else:
         arcade_path = args.arcade_path
         sim_path = args.sim_path
