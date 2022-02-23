@@ -102,7 +102,7 @@ def main():
                     # Grow the slice and retry
                     size += 1
                     continue
-            except (IndexError, gzip.BadGzipFile):
+            except (LookupError, gzip.BadGzipFile):
                 # No valid gzip?
                 return None
 
@@ -276,7 +276,7 @@ def main():
                     else: # No matches
                         sys.exit(f'Failed to locate code patterns in {eboot_name}. Your game version may be unsupported.')
 
-            except (OSError, KeyError, IndexError):
+            except (OSError, LookupError):
                 sys.exit('Failed to patch the boot executable!')
 
         def stepPatchMainMenuOverlay(path):
@@ -376,7 +376,7 @@ def main():
                     with open(main_menu_overlay_path, 'ab') as f:
                         f.write(data_to_append)
 
-            except (OSError, IndexError, SetupStepFailedError):
+            except (OSError, LookupError, SetupStepFailedError):
                 sys.exit('Failed to patch gt2_02.exe!')
 
         def stepReplaceCoreVOLFiles(path):
@@ -458,7 +458,7 @@ def main():
                     with open(arcade_overlay_path, 'ab') as f:
                         f.write(data_to_append)
 
-            except (OSError, IndexError, SetupStepFailedError):
+            except (OSError, LookupError, SetupStepFailedError):
                 eprint('Patching data-arcade.txd inside gt2_03.exe failed!')
                 handleOptionalStepFailure()
 
@@ -485,7 +485,9 @@ def main():
 
 try:
     main()
-except BaseException as e:
+except Exception as e:
+    eprint(f'{type(e).__name__}: {e}')
+except SystemExit as e:
     eprint(e)
 
 if interactive_mode:
