@@ -25,6 +25,10 @@ args = parser.parse_args()
 
 interactive_mode = len(sys.argv) == 1
 
+cur_python_version, required_python_version = sys.version_info[:3], (3, 10, 0)
+if not cur_python_version >= required_python_version:
+    sys.exit(f"Your Python version {'.'.join(str(i) for i in cur_python_version)} is too old. Please update to Python {'.'.join(str(i) for i in required_python_version)} or newer.")
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
