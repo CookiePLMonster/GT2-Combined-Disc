@@ -421,18 +421,34 @@ def main():
                     buf = f.read()
 
                 replacements = [
-                    (b'Obtain Licences in Disk 2 to Access All Courses', 0x3B, b'Obtain Licenses in Simulation Mode to Access All Courses')
+                    # Race strings
+                    (b'in the ARCADE MODE DISC', 29, b'in ARCADE MODE'),
+                    (b'on ARCADE MODE DISC', 29, b'in ARCADE MODE'),
+                    (b'sur le CD du MODE ARCADE', 29, b'dans le MODE ARCADE'),
+                    (b'auf der ARCADE-MODUS-CD', 29, b'im ARCADE-MODUS'),
+                    (b'nel DISCO A  MODALIT\xC0 ARCADE', 29, b'nella MODALIT\xC0 ARCADE'),
+                    (b'en el DISCO DE MODO ARCADE', 29, b'en el MODO ARCADE'),
+
+                    # Arcade strings
+                    (b'Obtain Licences in Disk 2 to Access All Courses', 59, b'Obtain Licenses in Simulation Mode to Access All Courses'),
+                    (b'Obtain Licences in GT mode to Access All Courses', 59, b'Obtain Licences in GT Mode to Access All Courses'),
+                    (b'Passer permis du CD 2 pour participer aux \xE9preuves', 59, b'Passer les permis du Mode GT pour d\xE9bloquer les circuits'),
+                    (b'Erwerben Sie Lizenzen f\x6Er alle Strecken auf CD 2', 59, b'Erwerben Sie Lizenzen f\x6Er alle Strecken im GT-Modus'),
+                    (b'Ottieni le patenti nel Disco 2 e accedi a tutti i percorsi', 59, b'Ottieni le patenti nella Modalit\xE0 GT e accedi ai percorsi'),
+                    (b'Obtenga carnes del Disco 2 para correr', 59, b'Obtenga carnes en GT Modo para correr')
                 ]
                 for replacement in replacements:
                     search_pattern = replacement[0].ljust(replacement[1], b'\0')
                     replace_pattern = replacement[2].ljust(replacement[1], b'\0')
+                    if len(search_pattern) > replacement[1] or len(replace_pattern) > replacement[1]:
+                        raise SetupStepFailedError
 
                     buf = buf.replace(search_pattern, replace_pattern, 1)
 
                 with open(path, 'wb') as f:
                     f.write(buf)
             except OSError:
-                raise SetupStepFailedError()
+                raise SetupStepFailedError
 
         def stepPatchRaceTXD(path):
             print('Patching data-race.txd...')
