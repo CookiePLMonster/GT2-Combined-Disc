@@ -379,6 +379,35 @@ def main():
             except (OSError, LookupError, SetupStepFailedError):
                 sys.exit('Failed to patch gt2_02.exe!')
 
+        def stepPatchRaceOverlay(path):
+            print('Patching gt2_01.exe (race overlay)...')
+            try:
+                main_menu_overlay_path = os.path.join(path, 'gt2_01.exe')
+                with PSEXE(main_menu_overlay_path, readonly=False, headless=True, baseAddress=0x80010000) as exe:
+
+                    # Those seem to be related to playing FMVs, but I don't know if it's actually used
+                    # Patching it anyway to match Arcade just in case
+                    if set_s3_to_5 := getPattern(exe, rb'\x10\x00\xB0\xAF\x01\x00\x13\x24', 4):
+                        exe.writeU16(set_s3_to_5, 5)
+                    else:
+                        raise SetupStepFailedError
+
+                    if compare_against_v0_1 := getPattern(exe, rb'\x00\x00\x00\x00.{2}\x73\x10'):
+                        # li v0, 1
+                        exe.writeU32(compare_against_v0_1, int.from_bytes(b'\x01\x00\x02\x24', byteorder='little', signed=False))
+                        # Change beq $v1, $s3 to beq $v1, $v0
+                        exe.writeU16(compare_against_v0_1+6, int.from_bytes(b'\x62\x10', byteorder='little', signed=False))
+                    else:
+                        raise SetupStepFailedError
+
+                    if set_a0_to_0 := getPattern(exe, rb'\x01\x00\x04\x24\x10\x00\xBF\x8F'):
+                        exe.writeU16(set_a0_to_0, 5)
+                    else:
+                        raise SetupStepFailedError
+
+            except (OSError, LookupError, SetupStepFailedError):
+                sys.exit('Failed to patch gt2_01.exe!')
+
         def stepReplaceCoreVOLFiles(path):
             print("Replacing core VOL files... Those files are replaced even if they don't match the originals.")
             try:
@@ -472,6 +501,7 @@ def main():
 
         stepPatchEboot(sim_files)
         stepPatchMainMenuOverlay(ovl_files)
+        stepPatchRaceOverlay(ovl_files)
         stepReplaceCoreVOLFiles(vol_files)
 
         stepPatchRaceTXD(vol_files) # Optional step
