@@ -26,6 +26,16 @@ args = parser.parse_args()
 
 interactive_mode = len(sys.argv) == 1
 
+if interactive_mode:
+    print(
+"""
+Gran Turismo 2 Combined Disc install script.
+Running the script in Interactive Mode.
+
+After paths to Arcade and Simulation discs are given, this script will unpack both discs and the VOL file from the Simulation Disc, then patch code and asset.
+The setup process may take some time, so please be patient and don't close this window even if the process seems stuck.
+""")
+
 cur_python_version, required_python_version = sys.version_info[:3], (3, 10, 0)
 if not cur_python_version >= required_python_version:
     sys.exit(f"Your Python version {'.'.join(str(i) for i in cur_python_version)} is too old. Please update to Python {'.'.join(str(i) for i in required_python_version)} or newer.")
@@ -78,8 +88,8 @@ def main():
             except ValueError:
                 print('Please use y/n or yes/no')
 
-    def handleOptionalStepFailure():
-        # TODO: Commandline argument to ignore errors if running non-interactive
+    def optionalStepFailed(text):
+        eprint(text)
         if interactive_mode:
             if not getYesNoAnswer('Continue anyway?'):
                 sys.exit('Setup aborted by user.')
@@ -140,8 +150,8 @@ def main():
     DISC_MODIFIED_TIMESTAMP = "2022022000000000+0"
 
     if interactive_mode:
-        arcade_path = getInputPath('Input the path to GT2 Arcade Disc:')
-        sim_path = getInputPath('Input the path to GT2 Simulation Disc:')
+        arcade_path = getInputPath('Input the path to GT2 Arcade Disc (.bin file):')
+        sim_path = getInputPath('Input the path to GT2 Simulation Disc (.bin file):')
         output_file = getResourcePath(input(f'Input the name of the output file (default: {DEFAULT_OUTPUT_NAME}): ') or DEFAULT_OUTPUT_NAME)
     else:
         arcade_path = args.arcade_path
@@ -275,10 +285,12 @@ def main():
                     if immediate := getPattern(exe, rb'\x00\x00\x00\x00.{4}\x01\x00\x04\x24\x10\x00\xBF\x8F', 8): # Pointer to \x01
                         exe.writeU16(immediate, 5)
                     else: # No matches
-                        sys.exit(f'Failed to locate code patterns in {eboot_name}. Your game version may be unsupported.')
+                        raise SetupStepFailedError
 
             except (OSError, LookupError):
                 sys.exit('Failed to patch the boot executable!')
+            except SetupStepFailedError:
+                sys.exit(f'Failed to locate code patterns in {eboot_name}! Your game version may be unsupported.')
 
         def stepPatchMainMenuOverlay(path):
             print('Patching gt2_02.exe (main menu overlay)...')
@@ -377,8 +389,10 @@ def main():
                     with open(main_menu_overlay_path, 'ab') as f:
                         f.write(data_to_append)
 
-            except (OSError, LookupError, SetupStepFailedError):
+            except (OSError, LookupError):
                 sys.exit('Failed to patch gt2_02.exe!')
+            except SetupStepFailedError:
+                sys.exit('Failed to locate code patterns in gt2_02.exe! Your game version may be unsupported.')
 
         def stepPatchRaceOverlay(path):
             print('Patching gt2_01.exe (race overlay)...')
@@ -406,18 +420,24 @@ def main():
                     else:
                         raise SetupStepFailedError
 
-            except (OSError, LookupError, SetupStepFailedError):
+            except (OSError, LookupError):
                 sys.exit('Failed to patch gt2_01.exe!')
+            except SetupStepFailedError:
+                sys.exit('Failed to locate code patterns in gt2_01.exe! Your game version may be unsupported.')
 
         def stepReplaceVOLFiles(path):
             print("Replacing VOL files...")
             try:
-                with open(os.path.join(VOL_REPLACEMENTS_PATH, 'file.hashes'), 'r') as f:
-                    hashes = {}
-                    for line in f:
-                        value, key = line.split('=', 1)
-                        # Path : Hash dictionary
-                        hashes[os.path.normcase(key.strip())] = int(value.strip(), 16)
+                hashes = {}
+                # Handle absence of the .hashes file gracefully in case the user removed it
+                try:
+                    with open(os.path.join(VOL_REPLACEMENTS_PATH, 'file.hashes'), 'r') as f:
+                        for line in f:
+                            value, key = line.split('=', 1)
+                            # Path : Hash dictionary
+                            hashes[os.path.normcase(key.strip())] = int(value.strip(), 16)
+                except OSError:
+                    print('Warning: file.hashes has been removed or cannot be read.')
 
                 for root, _, files in os.walk(VOL_REPLACEMENTS_PATH):
                     for file in files:
@@ -451,47 +471,43 @@ def main():
                 sys.exit('Failed to replace VOL files!')
 
         def patchTXD(path):
-            try:
-                with open(path, 'rb') as f:
-                    buf = f.read()
+            with open(path, 'rb') as f:
+                buf = f.read()
 
-                replacements = [
-                    # Race strings
-                    (b'in the ARCADE MODE DISC', 29, b'in ARCADE MODE'),
-                    (b'on ARCADE MODE DISC', 29, b'in ARCADE MODE'),
-                    (b'sur le CD du MODE ARCADE', 29, b'dans le MODE ARCADE'),
-                    (b'auf der ARCADE-MODUS-CD', 29, b'im ARCADE-MODUS'),
-                    (b'nel DISCO A  MODALIT\xC0 ARCADE', 29, b'nella MODALIT\xC0 ARCADE'),
-                    (b'en el DISCO DE MODO ARCADE', 29, b'en el MODO ARCADE'),
+            replacements = [
+                # Race strings
+                (b'in the ARCADE MODE DISC', 29, b'in ARCADE MODE'),
+                (b'on ARCADE MODE DISC', 29, b'in ARCADE MODE'),
+                (b'sur le CD du MODE ARCADE', 29, b'dans le MODE ARCADE'),
+                (b'auf der ARCADE-MODUS-CD', 29, b'im ARCADE-MODUS'),
+                (b'nel DISCO A  MODALIT\xC0 ARCADE', 29, b'nella MODALIT\xC0 ARCADE'),
+                (b'en el DISCO DE MODO ARCADE', 29, b'en el MODO ARCADE'),
 
-                    # Arcade strings
-                    (b'Obtain Licences in Disk 2 to Access All Courses', 59, b'Obtain Licenses in Simulation Mode to Access All Courses'),
-                    (b'Obtain Licences in GT mode to Access All Courses', 59, b'Obtain Licences in GT Mode to Access All Courses'),
-                    (b'Passer permis du CD 2 pour participer aux \xE9preuves', 59, b'Passer les permis du Mode GT pour d\xE9bloquer les circuits'),
-                    (b'Erwerben Sie Lizenzen f\x6Er alle Strecken auf CD 2', 59, b'Erwerben Sie Lizenzen f\x6Er alle Strecken im GT-Modus'),
-                    (b'Ottieni le patenti nel Disco 2 e accedi a tutti i percorsi', 59, b'Ottieni le patenti nella Modalit\xE0 GT e accedi ai percorsi'),
-                    (b'Obtenga carnes del Disco 2 para correr', 59, b'Obtenga carnes en GT Modo para correr')
-                ]
-                for replacement in replacements:
-                    search_pattern = replacement[0].ljust(replacement[1], b'\0')
-                    replace_pattern = replacement[2].ljust(replacement[1], b'\0')
-                    if len(search_pattern) > replacement[1] or len(replace_pattern) > replacement[1]:
-                        raise SetupStepFailedError
+                # Arcade strings
+                (b'Obtain Licences in Disk 2 to Access All Courses', 59, b'Obtain Licenses in Simulation Mode to Access All Courses'),
+                (b'Obtain Licences in GT mode to Access All Courses', 59, b'Obtain Licences in GT Mode to Access All Courses'),
+                (b'Passer permis du CD 2 pour participer aux \xE9preuves', 59, b'Passer les permis du Mode GT pour d\xE9bloquer les circuits'),
+                (b'Erwerben Sie Lizenzen f\x6Er alle Strecken auf CD 2', 59, b'Erwerben Sie Lizenzen f\x6Er alle Strecken im GT-Modus'),
+                (b'Ottieni le patenti nel Disco 2 e accedi a tutti i percorsi', 59, b'Ottieni le patenti nella Modalit\xE0 GT e accedi ai percorsi'),
+                (b'Obtenga carnes del Disco 2 para correr', 59, b'Obtenga carnes en GT Modo para correr')
+            ]
+            for replacement in replacements:
+                search_pattern = replacement[0].ljust(replacement[1], b'\0')
+                replace_pattern = replacement[2].ljust(replacement[1], b'\0')
+                if len(search_pattern) > replacement[1] or len(replace_pattern) > replacement[1]:
+                    raise SetupStepFailedError
 
-                    buf = buf.replace(search_pattern, replace_pattern, 1)
+                buf = buf.replace(search_pattern, replace_pattern, 1)
 
-                with open(path, 'wb') as f:
-                    f.write(buf)
-            except OSError:
-                raise SetupStepFailedError
+            with open(path, 'wb') as f:
+                f.write(buf)
 
         def stepPatchRaceTXD(path):
             print('Patching data-race.txd...')
             try:
                 patchTXD(os.path.join(path, '.text', 'data-race.txd'))
-            except SetupStepFailedError:
-                eprint('Patching data-race.txd failed!')
-                handleOptionalStepFailure()
+            except (OSError, SetupStepFailedError):
+                optionalStepFailed('Patching data-race.txd failed!')
 
         def stepPatchArcadeTXD(path):
             print('Patching data-arcade.txd inside gt2_03.exe (arcade mode overlay)...')
@@ -538,9 +554,10 @@ def main():
                     with open(arcade_overlay_path, 'ab') as f:
                         f.write(data_to_append)
 
-            except (OSError, LookupError, SetupStepFailedError):
-                eprint('Patching data-arcade.txd inside gt2_03.exe failed!')
-                handleOptionalStepFailure()
+            except (OSError, LookupError):
+                optionalStepFailed('Patching data-arcade.txd inside gt2_03.exe failed!')
+            except SetupStepFailedError:
+                optionalStepFailed('Failed to locate code patterns in gt2_03.exe! Your game version may be unsupported.')
 
         # Those all call sys.exit on failure
         arcade_files, sim_files = stepUnpackDiscs()
@@ -569,7 +586,7 @@ try:
 except Exception as e:
     eprint(f'{type(e).__name__}: {e}')
 except SystemExit as e:
-    eprint(e)
+    eprint(f'Error: {e}')
 
 if interactive_mode:
-    input('Press any key to exit...')
+    input('\nPress any key to exit...')
