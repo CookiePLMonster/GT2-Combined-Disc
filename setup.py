@@ -2,6 +2,7 @@
 from gttools import ovl, PSEXE
 from array import array
 import argparse
+import binascii
 import gzip
 import io
 import os
@@ -408,12 +409,46 @@ def main():
             except (OSError, LookupError, SetupStepFailedError):
                 sys.exit('Failed to patch gt2_01.exe!')
 
-        def stepReplaceCoreVOLFiles(path):
-            print("Replacing core VOL files... Those files are replaced even if they don't match the originals.")
+        def stepReplaceVOLFiles(path):
+            print("Replacing VOL files...")
             try:
-                shutil.copytree(os.path.join(VOL_REPLACEMENTS_PATH, 'core'), path, dirs_exist_ok=True)
-            except shutil.Error:
-                sys.exit('Failed to replace core VOL files!')
+                with open(os.path.join(VOL_REPLACEMENTS_PATH, 'file.hashes'), 'r') as f:
+                    hashes = {}
+                    for line in f:
+                        value, key = line.split('=', 1)
+                        # Path : Hash dictionary
+                        hashes[os.path.normcase(key.strip())] = int(value.strip(), 16)
+
+                for root, _, files in os.walk(VOL_REPLACEMENTS_PATH):
+                    for file in files:
+                        if file == 'file.hashes':
+                            continue
+
+                        copy_file = True
+                        absolute_src_path = os.path.join(root, file)
+                        relative_src_path = os.path.normcase(os.path.relpath(absolute_src_path, VOL_REPLACEMENTS_PATH))
+
+                        absolute_dst_path = os.path.join(path, relative_src_path)
+                        expected_hash = hashes.get(relative_src_path)
+                        if expected_hash is not None:
+                            # If the file is a GZIP file, decompress first as we're interested in CRC32 of the contents, not archive
+                            try:
+                                with gzip.open(absolute_dst_path, 'rb') as f:
+                                    actual_hash = binascii.crc32(f.read()) & 0xFFFFFFFF
+                            except gzip.BadGzipFile:
+                                # Try uncompressed
+                                with open(absolute_dst_path, 'rb') as f:
+                                    actual_hash = binascii.crc32(f.read()) & 0xFFFFFFFF
+
+                            copy_file = expected_hash == actual_hash
+
+                        if copy_file:
+                            shutil.copy2(absolute_src_path, absolute_dst_path)
+                        else:
+                            print(f'Warning: {relative_src_path} was not overwritten as it is already modified.')
+
+            except (OSError, SetupStepFailedError, shutil.Error):
+                sys.exit('Failed to replace VOL files!')
 
         def patchTXD(path):
             try:
@@ -518,7 +553,7 @@ def main():
         stepPatchEboot(sim_files)
         stepPatchMainMenuOverlay(ovl_files)
         stepPatchRaceOverlay(ovl_files)
-        stepReplaceCoreVOLFiles(vol_files)
+        stepReplaceVOLFiles(vol_files)
 
         stepPatchRaceTXD(vol_files) # Optional step
         stepPatchArcadeTXD(ovl_files) # Optional step
