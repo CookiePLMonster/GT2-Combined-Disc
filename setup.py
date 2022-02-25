@@ -20,6 +20,7 @@ parser = argparse.ArgumentParser(description='Gran Turismo 2 Combined Disc insta
 parser.add_argument('-a', '--arcade-disc', type=str, dest='arcade_path', help='path to the Arcade Mode disc')
 parser.add_argument('-s', '--simulation-disc', type=str, dest='sim_path', help='path to the Simulation Mode disc')
 parser.add_argument('-o', '--output', type=str, dest='output_file', default=DEFAULT_OUTPUT_NAME, help='name of the output file (default: %(default)s)')
+parser.add_argument('-f', '--no-fmvs', dest='no_fmvs', action='store_true', help='Do not include movies in the combined disc. This leaves out the intro movie, credits and track previews in Arcade Mode, but allows the disc to be burned on a CD.')
 parser.add_argument('-e', '--ignore-errors', dest='ignore_errors', action='store_true', help='ignore non-critical errors encountered during setup. Critical errors are never ignored')
 
 args = parser.parse_args()
@@ -65,28 +66,38 @@ def main():
                 return result
             print(f'{display_path!r} is not a valid file!')
 
-    def getYesNoAnswer(prompt):
+    def getYesNoAnswer(prompt, default=None):
         # Copied from distutils.util since it's deprecated in 3.10 and will be removed in 3.12
         def strtobool(val):
-            """Convert a string representation of truth to true (1) or false (0).
+            """Convert a string representation of truth to True or False.
             True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
             are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
             'val' is anything else.
             """
             val = val.lower()
             if val in ('y', 'yes', 't', 'true', 'on', '1'):
-                return 1
+                return True
             elif val in ('n', 'no', 'f', 'false', 'off', '0'):
-                return 0
+                return False
             else:
                 raise ValueError(f"invalid truth value {val!r}")
 
+        try:
+            default_return = strtobool(default)
+            default_str = ' [Y/n]: ' if default_return else ' [y/N]: '
+        except ValueError:
+            default_return = None
+            default_str = ' [y/n]: '
+
         while True:
-            user_input = input(prompt + ' [y/n]: ')
+            user_input = input(prompt + default_str)
             try:
-                return bool(strtobool(user_input))
+                return strtobool(user_input)
             except ValueError:
-                print('Please use y/n or yes/no')
+                if default_return is None:
+                    print('Please use y/n or yes/no')
+                else:
+                    return default_return
 
     def optionalStepFailed(text):
         eprint(text)
@@ -152,10 +163,13 @@ def main():
     if interactive_mode:
         arcade_path = getInputPath('Input the path to GT2 Arcade Disc (.bin file):')
         sim_path = getInputPath('Input the path to GT2 Simulation Disc (.bin file):')
+        no_fmvs = not getYesNoAnswer('Include FMVs in the combined disc? If selected, the combined disc will have the intro movie, '
+                'credits and track previews in Arcade Mode, but it will be too big to burn on a CD. Select No if you want to use the combined disc on a console, Yes otherwise.', default='yes')
         output_file = getResourcePath(input(f'Input the name of the output file (default: {DEFAULT_OUTPUT_NAME}): ') or DEFAULT_OUTPUT_NAME)
     else:
         arcade_path = args.arcade_path
         sim_path = args.sim_path
+        no_fmvs = args.no_fmvs
         output_file = args.output_file
 
     with tempfile.TemporaryDirectory(prefix='gt2combined-', ignore_cleanup_errors=True) as temp_dir:
@@ -249,20 +263,21 @@ def main():
                 sim_project.set('image_name', os.path.splitext(output_file)[0] + '.bin')
                 sim_project.set('cue_sheet', os.path.splitext(output_file)[0] + '.cue')
 
-                arcade_data_track = arcade_project.find("./track[@type='data']")
-                sim_data_track = sim_project.find("./track[@type='data']")
+                if not no_fmvs:
+                    arcade_data_track = arcade_project.find("./track[@type='data']")
+                    sim_data_track = sim_project.find("./track[@type='data']")
 
-                sim_identifiers = sim_data_track.find('identifiers')
-                sim_identifiers.set('modification_date', DISC_MODIFIED_TIMESTAMP)
+                    sim_identifiers = sim_data_track.find('identifiers')
+                    sim_identifiers.set('modification_date', DISC_MODIFIED_TIMESTAMP)
 
-                arcade_streams = arcade_data_track.find("./directory_tree/file[@source='STREAM.DAT']")
-                sim_faulty = sim_data_track.find("./directory_tree/file[@source='FAULTY.PSX']")
+                    arcade_streams = arcade_data_track.find("./directory_tree/file[@source='STREAM.DAT']")
+                    sim_faulty = sim_data_track.find("./directory_tree/file[@source='FAULTY.PSX']")
 
-                sim_faulty.text = arcade_streams.text
-                sim_faulty.attrib = arcade_streams.attrib
+                    sim_faulty.text = arcade_streams.text
+                    sim_faulty.attrib = arcade_streams.attrib
 
-                # STREAMS.DAT needs an absolute path
-                sim_faulty.set('source', os.path.join(arcade_path, sim_faulty.get('source')))
+                    # STREAMS.DAT needs an absolute path
+                    sim_faulty.set('source', os.path.join(arcade_path, sim_faulty.get('source')))
 
                 sim_tree.write(sim_xml)
             except ET.ParseError as e:
@@ -271,6 +286,10 @@ def main():
                 sys.exit('XML parse failure.')
 
         def stepPatchEboot(path):
+            # If we don't want FMVs, there is nothing to patch in the main executable
+            if no_fmvs:
+                return
+
             print('Patching the boot executable...')
             try:
                 # "Support" all regions by reading SYSTEM.CNF
@@ -395,6 +414,10 @@ def main():
                 sys.exit('Failed to locate code patterns in gt2_02.exe! Your game version may be unsupported.')
 
         def stepPatchRaceOverlay(path):
+            # If we don't want FMVs, there is nothing to patch in gt2_01.exe
+            if no_fmvs:
+                return
+
             print('Patching gt2_01.exe (race overlay)...')
             try:
                 main_menu_overlay_path = os.path.join(path, 'gt2_01.exe')
