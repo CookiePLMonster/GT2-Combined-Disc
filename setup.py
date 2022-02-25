@@ -151,6 +151,12 @@ def main():
             return exe.vaddr(match.start()) + offset
         return None
 
+    def alignByteArray(buf, offset, alignment):
+        mask = -alignment & 0xffffffff
+        aligned_offset = (offset + (alignment - 1)) & mask
+        buf.extend(b'\x00' * (aligned_offset - offset))
+        return aligned_offset
+
     # Set up paths
     MKPSXISO_PATH = getResourcePath('tools/mkpsxiso')
     GTVOLTOOL_PATH = getResourcePath('tools/GTVolTool')
@@ -341,6 +347,7 @@ def main():
                         menu_action7.extend(struct.pack('<I', menu_action_j)) # j def_800114CC
                         menu_action7.extend(b'\x00' * 4) # nop
 
+                        added_data_vaddr_cursor = alignByteArray(data_to_append, added_data_vaddr_cursor, 4)
                         data_to_append.extend(menu_action7)
                         exe.writeAddress(menu_actions_jump_table_ptr + 7*4, added_data_vaddr_cursor)
                         added_data_vaddr_cursor += len(menu_action7)
@@ -358,6 +365,8 @@ def main():
                         # Relocate 0x20800F
                         unk_menu_defs_off = exe.addr(exe.readIndirectPtr(draw_menu_entries+4, draw_menu_entries+12))
                         unk_menu_defs = exe.map[unk_menu_defs_off:unk_menu_defs_off+4]
+
+                        added_data_vaddr_cursor = alignByteArray(data_to_append, added_data_vaddr_cursor, 4)
                         data_to_append.extend(unk_menu_defs)
                         exe.writeIndirectPtr(draw_menu_entries+4, draw_menu_entries+12, added_data_vaddr_cursor)
                         added_data_vaddr_cursor += len(unk_menu_defs)
@@ -386,6 +395,7 @@ def main():
                             menu_item_definitions_array_ptr += 4
                             menu_item_definitions_buffer_offset += 7*12
 
+                        added_data_vaddr_cursor = alignByteArray(data_to_append, added_data_vaddr_cursor, 4)
                         data_to_append.extend(readMenuDefinitions('es'))
                         exe.writeAddress(menu_item_definitions_array_ptr, added_data_vaddr_cursor)
                         added_data_vaddr_cursor += 7*12
@@ -566,6 +576,8 @@ def main():
                     if len(compressed_data) > orig_gzip_size:
                         # Append
                         vaddr = exe.vaddr(exe.map.size())
+
+                        vaddr = alignByteArray(data_to_append, vaddr, 4)
                         exe.writeIndirectPtr(data_arcade_gzip_ptr, data_arcade_gzip_ptr+4, vaddr)
                         data_to_append.extend(compressed_data)
                     else:
