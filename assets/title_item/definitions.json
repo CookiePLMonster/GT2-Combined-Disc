@@ -1,0 +1,448 @@
+{
+  "entries": {
+    "de": [
+      "arcade_modus.png",
+      "gran_turismo_modus.png",
+      "tex_27.png",
+      "tex_28.png",
+      "tex_29.png",
+      "tex_30.png",
+      "tex_31.png"
+    ],
+    "en-uk": [
+      "arcade_mode.png",
+      "gran_turismo_mode.png",
+      "tex_15.png",
+      "tex_16.png",
+      "tex_17.png",
+      "tex_18.png",
+      "tex_19.png"
+    ],
+    "en-us": [
+      "arcade_mode.png",
+      "simulation_mode.png",
+      "tex_9.png",
+      "tex_10.png",
+      "tex_11.png",
+      "tex_12.png",
+      "tex_13.png"
+    ],
+    "es": [
+      "modo_arcade.png",
+      "modo_gran_turismo.png",
+      "tex_39.png",
+      "tex_40.png",
+      "tex_41.png",
+      "tex_42.png",
+      "tex_43.png"
+    ],
+    "fr": [
+      "mode_arcade.png",
+      "mode_gran_turismo.png",
+      "tex_21.png",
+      "tex_22.png",
+      "tex_23.png",
+      "tex_24.png",
+      "tex_25.png"
+    ],
+    "it": [
+      "modalita_arcade.png",
+      "modalita_gran_turismo.png",
+      "tex_33.png",
+      "tex_34.png",
+      "tex_35.png",
+      "tex_36.png",
+      "tex_37.png"
+    ],
+    "jp": [
+      "arcade_mode.png",
+      "gran_turismo_mode.png",
+      "tex_3.png",
+      "tex_4.png",
+      "tex_5.png",
+      "tex_6.png",
+      "tex_7.png"
+    ],
+    "misc": [
+      "tex_1.png"
+    ]
+  },
+  "textures": {
+    "arcade_mode.png": {
+      "height": 21,
+      "palette": 15730,
+      "texture_page": 13,
+      "width": 90,
+      "x": 0,
+      "y": 67
+    },
+    "arcade_modus.png": {
+      "height": 21,
+      "palette": 15728,
+      "texture_page": 13,
+      "width": 96,
+      "x": 88,
+      "y": 23
+    },
+    "gran_turismo_mode.png": {
+      "height": 22,
+      "palette": 15602,
+      "texture_page": 12,
+      "width": 119,
+      "x": 120,
+      "y": 123
+    },
+    "gran_turismo_modus.png": {
+      "height": 22,
+      "palette": 15543,
+      "texture_page": 12,
+      "width": 126,
+      "x": 0,
+      "y": 101
+    },
+    "modalita_arcade.png": {
+      "height": 21,
+      "palette": 15606,
+      "texture_page": 12,
+      "width": 107,
+      "x": 0,
+      "y": 168
+    },
+    "modalita_gran_turismo.png": {
+      "height": 22,
+      "palette": 15537,
+      "texture_page": 12,
+      "width": 137,
+      "x": 0,
+      "y": 24
+    },
+    "mode_arcade.png": {
+      "height": 21,
+      "palette": 15731,
+      "texture_page": 13,
+      "width": 90,
+      "x": 90,
+      "y": 67
+    },
+    "mode_gran_turismo.png": {
+      "height": 22,
+      "palette": 15600,
+      "texture_page": 12,
+      "width": 120,
+      "x": 126,
+      "y": 101
+    },
+    "modo_arcade.png": {
+      "height": 21,
+      "palette": 15732,
+      "texture_page": 13,
+      "width": 90,
+      "x": 0,
+      "y": 88
+    },
+    "modo_gran_turismo.png": {
+      "height": 22,
+      "palette": 15601,
+      "texture_page": 12,
+      "width": 120,
+      "x": 0,
+      "y": 123
+    },
+    "simulation_mode.png": {
+      "height": 22,
+      "palette": 15605,
+      "texture_page": 12,
+      "width": 104,
+      "x": 108,
+      "y": 166
+    },
+    "tex_1.png": {
+      "height": 24,
+      "palette": 15536,
+      "texture_page": 12,
+      "width": 256,
+      "x": 0,
+      "y": 0
+    },
+    "tex_10.png": {
+      "height": 23,
+      "palette": 15858,
+      "texture_page": 13,
+      "width": 52,
+      "x": 0,
+      "y": 150
+    },
+    "tex_11.png": {
+      "height": 21,
+      "palette": 15796,
+      "texture_page": 13,
+      "width": 72,
+      "x": 184,
+      "y": 23
+    },
+    "tex_12.png": {
+      "height": 20,
+      "palette": 15798,
+      "texture_page": 13,
+      "width": 72,
+      "x": 0,
+      "y": 130
+    },
+    "tex_13.png": {
+      "height": 21,
+      "palette": 15793,
+      "texture_page": 13,
+      "width": 84,
+      "x": 0,
+      "y": 109
+    },
+    "tex_15.png": {
+      "height": 23,
+      "palette": 15670,
+      "texture_page": 13,
+      "width": 88,
+      "x": 92,
+      "y": 0
+    },
+    "tex_16.png": {
+      "height": 23,
+      "palette": 15859,
+      "texture_page": 13,
+      "width": 52,
+      "x": 0,
+      "y": 173
+    },
+    "tex_17.png": {
+      "height": 21,
+      "palette": 15797,
+      "texture_page": 13,
+      "width": 72,
+      "x": 180,
+      "y": 67
+    },
+    "tex_18.png": {
+      "height": 20,
+      "palette": 15799,
+      "texture_page": 13,
+      "width": 72,
+      "x": 168,
+      "y": 111
+    },
+    "tex_19.png": {
+      "height": 21,
+      "palette": 15794,
+      "texture_page": 13,
+      "width": 84,
+      "x": 84,
+      "y": 111
+    },
+    "tex_21.png": {
+      "height": 24,
+      "palette": 15607,
+      "texture_page": 12,
+      "width": 92,
+      "x": 0,
+      "y": 189
+    },
+    "tex_22.png": {
+      "height": 23,
+      "palette": 15860,
+      "texture_page": 13,
+      "width": 52,
+      "x": 0,
+      "y": 196
+    },
+    "tex_23.png": {
+      "height": 23,
+      "palette": 15541,
+      "texture_page": 12,
+      "width": 124,
+      "x": 0,
+      "y": 69
+    },
+    "tex_24.png": {
+      "height": 27,
+      "palette": 15539,
+      "texture_page": 12,
+      "width": 108,
+      "x": 137,
+      "y": 24
+    },
+    "tex_25.png": {
+      "height": 24,
+      "palette": 15540,
+      "texture_page": 12,
+      "width": 120,
+      "x": 128,
+      "y": 51
+    },
+    "tex_27.png": {
+      "height": 23,
+      "palette": 15538,
+      "texture_page": 12,
+      "width": 128,
+      "x": 0,
+      "y": 46
+    },
+    "tex_28.png": {
+      "height": 23,
+      "palette": 15856,
+      "texture_page": 13,
+      "width": 60,
+      "x": 168,
+      "y": 131
+    },
+    "tex_29.png": {
+      "height": 23,
+      "palette": 15665,
+      "texture_page": 12,
+      "width": 92,
+      "x": 92,
+      "y": 189
+    },
+    "tex_3.png": {
+      "height": 24,
+      "palette": 15666,
+      "texture_page": 12,
+      "width": 88,
+      "x": 92,
+      "y": 212
+    },
+    "tex_30.png": {
+      "height": 23,
+      "palette": 15795,
+      "texture_page": 13,
+      "width": 72,
+      "x": 184,
+      "y": 0
+    },
+    "tex_31.png": {
+      "height": 23,
+      "palette": 15603,
+      "texture_page": 12,
+      "width": 108,
+      "x": 0,
+      "y": 145
+    },
+    "tex_33.png": {
+      "height": 23,
+      "palette": 15734,
+      "texture_page": 13,
+      "width": 80,
+      "x": 172,
+      "y": 44
+    },
+    "tex_34.png": {
+      "height": 23,
+      "palette": 15861,
+      "texture_page": 13,
+      "width": 52,
+      "x": 0,
+      "y": 219
+    },
+    "tex_35.png": {
+      "height": 23,
+      "palette": 15735,
+      "texture_page": 13,
+      "width": 80,
+      "x": 90,
+      "y": 88
+    },
+    "tex_36.png": {
+      "height": 23,
+      "palette": 15729,
+      "texture_page": 13,
+      "width": 84,
+      "x": 88,
+      "y": 44
+    },
+    "tex_37.png": {
+      "height": 21,
+      "palette": 15604,
+      "texture_page": 12,
+      "width": 112,
+      "x": 108,
+      "y": 145
+    },
+    "tex_39.png": {
+      "height": 26,
+      "palette": 15542,
+      "texture_page": 12,
+      "width": 108,
+      "x": 124,
+      "y": 75
+    },
+    "tex_4.png": {
+      "height": 24,
+      "palette": 15862,
+      "texture_page": 13,
+      "width": 44,
+      "x": 52,
+      "y": 155
+    },
+    "tex_40.png": {
+      "height": 23,
+      "palette": 15857,
+      "texture_page": 13,
+      "width": 60,
+      "x": 72,
+      "y": 132
+    },
+    "tex_41.png": {
+      "height": 23,
+      "palette": 15671,
+      "texture_page": 13,
+      "width": 88,
+      "x": 0,
+      "y": 22
+    },
+    "tex_42.png": {
+      "height": 23,
+      "palette": 15792,
+      "texture_page": 13,
+      "width": 80,
+      "x": 170,
+      "y": 88
+    },
+    "tex_43.png": {
+      "height": 21,
+      "palette": 15733,
+      "texture_page": 13,
+      "width": 88,
+      "x": 0,
+      "y": 45
+    },
+    "tex_5.png": {
+      "height": 24,
+      "palette": 15667,
+      "texture_page": 12,
+      "width": 72,
+      "x": 184,
+      "y": 188
+    },
+    "tex_6.png": {
+      "height": 22,
+      "palette": 15668,
+      "texture_page": 12,
+      "width": 68,
+      "x": 180,
+      "y": 212
+    },
+    "tex_7.png": {
+      "height": 22,
+      "palette": 15669,
+      "texture_page": 13,
+      "width": 92,
+      "x": 0,
+      "y": 0
+    },
+    "tex_9.png": {
+      "height": 23,
+      "palette": 15664,
+      "texture_page": 12,
+      "width": 92,
+      "x": 0,
+      "y": 213
+    }
+  }
+}

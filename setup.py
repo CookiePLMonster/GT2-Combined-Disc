@@ -164,7 +164,7 @@ def main():
     MENU_ENTRIES_PATH = getResourcePath('menu_entries')
 
     XML_NAME = 'files.xml'
-    DISC_MODIFIED_TIMESTAMP = "2022022000000000+0"
+    DISC_MODIFIED_TIMESTAMP = "2022022600000000+0"
 
     if interactive_mode:
         arcade_path = getInputPath('Input the path to GT2 Arcade Disc (.bin file):')
