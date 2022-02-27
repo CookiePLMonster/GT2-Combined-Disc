@@ -22,10 +22,17 @@ parser.add_argument('-s', '--simulation-disc', type=str, dest='sim_path', help='
 parser.add_argument('-o', '--output', type=str, dest='output_file', default=DEFAULT_OUTPUT_NAME, help='name of the output file (default: %(default)s)')
 parser.add_argument('-f', '--no-fmvs', dest='no_fmvs', action='store_true', help='Do not include movies in the combined disc. This leaves out the intro movie, credits and track previews in Arcade Mode, but allows the disc to be burned on a CD.')
 parser.add_argument('-e', '--ignore-errors', dest='ignore_errors', action='store_true', help='ignore non-critical errors encountered during setup. Critical errors are never ignored')
+parser.add_argument('-t', '--text-only', dest='text_only', action='store_true', help='Do not use native filepicker windows.')
 
 args = parser.parse_args()
-
-interactive_mode = len(sys.argv) == 1
+interactive_mode = len(tuple(a for a in sys.argv if a not in ("-t", "--text-only"))) == 1
+gui_mode = not args.text_only
+if gui_mode:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except ImportError:
+        gui_mode = False
 
 if interactive_mode:
     print(
@@ -36,6 +43,14 @@ Running the script in Interactive Mode.
 After paths to Arcade and Simulation discs are given, this script will unpack both discs and the VOL file from the Simulation Disc, then patch code and asset.
 The setup process may take some time, so please be patient and don't close this window even if the process seems stuck.
 """)
+if gui_mode:
+    print("About to open dialogs file paths (re-run script with -t to run without dialogs).")
+    if os.name == 'nt':
+        os.system("pause")
+    else:
+        os.system('read -s -n 1 -p "Press any key to continue ..."')
+    root = tk.Tk()  # init Tk to make filedialog work
+    root.withdraw()  # withdraw because root window not needed
 
 cur_python_version, required_python_version = sys.version_info[:3], (3, 10, 0)
 if not cur_python_version >= required_python_version:
@@ -52,19 +67,45 @@ def main():
     class SetupStepFailedError(ValueError):
         pass
 
-    def getInputPath(prompt):
-        import shlex
-
+    def getOutputPath(prompt, default):
+        prompt_cli = prompt + f' ({default=}): '
         while True:
-            path = ''
-            while len(path) == 0:
-                path = input(prompt + ' ')
+            if gui_mode:
+                filename = filedialog.asksaveasfilename(confirmoverwrite=False, initialfile=default, title=prompt, defaultextension=".bin", filetypes=(("BIN file", ""), ))
+            else:
+                filename = getResourcePath(input(prompt_cli) or default)
+            if not filename:
+                sys.exit('Setup aborted by user.')
+            elif os.path.isfile(filename):
+                print(f'{filename!r} already exists!')
+            else:
+                try:
+                    open(filename, 'w+').close()
+                    os.unlink(filename)
+                    return filename
+                except OSError:
+                    print(f'{filename!r} is not writable!')
 
-            display_path = shlex.split(path)[0]
-            result = getResourcePath(display_path)
-            if os.path.isfile(result):
-                return result
-            print(f'{display_path!r} is not a valid file!')
+    def getInputPath(prompt):
+        if gui_mode:
+            while True:
+                filename = filedialog.askopenfilename(title=prompt)
+                if not filename:
+                    sys.exit('Setup aborted by user.')
+                if os.path.isfile(filename):
+                    return filename
+                print(f'{filename!r} is not a valid file!')
+        else:
+            import shlex
+            while True:
+                path = ''
+                while len(path) == 0:
+                    path = input(prompt + ' ')
+                display_path = shlex.split(path)[0]
+                result = getResourcePath(display_path)
+                if os.path.isfile(result):
+                    return result
+                print(f'{display_path!r} is not a valid file!')
 
     def getYesNoAnswer(prompt, default=None):
         # Copied from distutils.util since it's deprecated in 3.10 and will be removed in 3.12
@@ -167,11 +208,11 @@ def main():
     DISC_MODIFIED_TIMESTAMP = "2022022600000000+0"
 
     if interactive_mode:
-        arcade_path = getInputPath('Input the path to GT2 Arcade Disc (.bin file):')
-        sim_path = getInputPath('Input the path to GT2 Simulation Disc (.bin file):')
+        arcade_path = getInputPath('Enter the path to GT2 Arcade Disc (.bin file):')
+        sim_path = getInputPath('Enter the path to GT2 Simulation Disc (.bin file):')
+        output_file = getOutputPath("Enter the location to save the output file", DEFAULT_OUTPUT_NAME)
         no_fmvs = not getYesNoAnswer('Include FMVs in the combined disc? If selected, the combined disc will have the intro movie, '
                 'credits and track previews in Arcade Mode, but it will be too big to burn on a CD. Select No if you want to use the combined disc on a console, Yes otherwise.', default='yes')
-        output_file = getResourcePath(input(f'Input the name of the output file (default: {DEFAULT_OUTPUT_NAME}): ') or DEFAULT_OUTPUT_NAME)
     else:
         arcade_path = args.arcade_path
         sim_path = args.sim_path
