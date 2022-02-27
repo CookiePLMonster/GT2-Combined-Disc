@@ -72,7 +72,7 @@ def main():
         prompt_cli = prompt + f' ({default=}): '
         while True:
             if gui_mode:
-                filename = filedialog.asksaveasfilename(confirmoverwrite=False, initialfile=default, title=prompt, defaultextension=".bin", filetypes=(("BIN file", ""), ))
+                filename = filedialog.asksaveasfilename(confirmoverwrite=False, initialfile=default, title=prompt, defaultextension=".bin", filetypes=(("BIN file", ".bin"), ))
             else:
                 filename = getResourcePath(input(prompt_cli) or default)
             if not filename:
