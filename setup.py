@@ -90,7 +90,7 @@ def main():
     def getInputPath(prompt):
         if gui_mode:
             while True:
-                filename = filedialog.askopenfilename(title=prompt)
+                filename = filedialog.askopenfilename(title=prompt, defaultextension=".bin", filetypes=(("BIN file", ".bin .iso"), ))
                 if not filename:
                     sys.exit('Setup aborted by user.')
                 if os.path.isfile(filename):
