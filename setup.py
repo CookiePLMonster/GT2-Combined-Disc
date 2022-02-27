@@ -24,6 +24,10 @@ parser.add_argument('-f', '--no-fmvs', dest='no_fmvs', action='store_true', help
 parser.add_argument('-e', '--ignore-errors', dest='ignore_errors', action='store_true', help='ignore non-critical errors encountered during setup. Critical errors are never ignored')
 parser.add_argument('-t', '--text-only', dest='text_only', action='store_true', help='Do not use native filepicker windows.')
 
+cur_python_version, required_python_version = sys.version_info[:3], (3, 10, 0)
+if not cur_python_version >= required_python_version:
+    sys.exit(f"Your Python version {'.'.join(str(i) for i in cur_python_version)} is too old. Please update to Python {'.'.join(str(i) for i in required_python_version)} or newer.")
+
 args = parser.parse_args()
 interactive_mode = len(tuple(a for a in sys.argv if a not in ("-t", "--text-only"))) == 1
 gui_mode = not args.text_only
@@ -51,10 +55,6 @@ if gui_mode:
         os.system('read -s -n 1 -p "Press any key to continue ..."')
     root = tk.Tk()  # init Tk to make filedialog work
     root.withdraw()  # withdraw because root window not needed
-
-cur_python_version, required_python_version = sys.version_info[:3], (3, 10, 0)
-if not cur_python_version >= required_python_version:
-    sys.exit(f"Your Python version {'.'.join(str(i) for i in cur_python_version)} is too old. Please update to Python {'.'.join(str(i) for i in required_python_version)} or newer.")
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
