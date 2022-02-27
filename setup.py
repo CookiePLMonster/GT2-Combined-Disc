@@ -53,8 +53,12 @@ if gui_mode:
         os.system("pause")
     else:
         os.system('read -s -n 1 -p "Press any key to continue ..."')
-    root = tk.Tk()  # init Tk to make filedialog work
-    root.withdraw()  # withdraw because root window not needed
+    try:
+        root = tk.Tk()  # init Tk to make filedialog work
+        root.withdraw()  # withdraw because root window not needed
+    except Exception as e:
+        gui_mode = False
+        print(f"Forcing text-only mode because of problem initializing Tkinter GUI: {e.__repr__()}", file=sys.stderr)
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
