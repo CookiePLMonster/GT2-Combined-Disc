@@ -49,10 +49,7 @@ The setup process may take some time, so please be patient and don't close this 
 """)
 if gui_mode:
     print("About to open dialogs file paths (re-run script with -t to run without dialogs).")
-    if os.name == 'nt':
-        os.system("pause")
-    else:
-        os.system('read -s -n 1 -p "Press any key to continue ..."')
+    input("Press Enter to continue ...")
     try:
         root = tk.Tk()  # init Tk to make filedialog work
         root.withdraw()  # withdraw because root window not needed
