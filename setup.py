@@ -45,7 +45,13 @@ def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
 def getResourcePath(path):
-    return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
+    if getattr(sys, 'frozen', False):
+        # For frozen one-file executable
+        application_path = os.path.dirname(sys.executable)
+    else:
+        application_path = os.path.dirname(os.path.realpath(__file__))
+
+    return os.path.join(application_path, path)
 
 def main():
     # Utils

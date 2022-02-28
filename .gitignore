@@ -1,1 +1,9 @@
 /.vscode/
+
+# Python
+__pycache__
+.mypy_cache
+
+# Build artefacts
+Build
+dist
