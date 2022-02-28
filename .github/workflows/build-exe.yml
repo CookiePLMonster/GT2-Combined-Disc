@@ -16,12 +16,20 @@ jobs:
         with:
           repository: CookiePLMonster/GTModTools
           path: gttools
+      - name: Checkout PyInstaller
+        uses: actions/checkout@v2
+        with:
+          repository: pyinstaller/pyinstaller
+          path: custom_pyinstaller
+          ref: v4.9
       - name: Setup python 3.10
         uses: actions/setup-python@v2
         with:
           python-version: "3.10"
-      - name: Install pyinstaller from PyPI
-        run: pip install pyinstaller==4.9
+      - name: Compile pyinstaller from source
+        run: cd custom_pyinstaller/bootloader && python ./waf all --target-arch=64bit
+      - name: Install pyinstaller
+        run: pip install wheel && cd custom_pyinstaller && python setup.py install
       - name: Package into a one file executable
         run: pyinstaller -F setup.py -n gt2_discs_combiner
       - name: Copy resources into /dist
