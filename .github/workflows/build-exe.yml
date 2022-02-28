@@ -1,0 +1,34 @@
+name: Build a one-file executable
+
+on:
+  push:
+    tags:
+      - "**"
+
+jobs:
+  Windows-Build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Checkout the GTModTools
+        uses: actions/checkout@v2
+        with:
+          repository: CookiePLMonster/GTModTools
+          path: gttools
+      - name: Setup python 3.10
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10"
+      - name: Install pyinstaller from PyPI
+        run: pip install pyinstaller==4.9
+      - name: Package into a one file executable
+        run: pyinstaller -F setup.py -n gt2_discs_combiner
+      - name: Copy resources into /dist
+        run: foreach ($directory in ("menu_entries", "tools", "vol_replacements")) { Xcopy /E /I $directory dist\$directory }
+      - name: Package the build into a zip file
+        run: tar -c -f gt2_discs_combiner.zip -C dist *
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: gt2_discs_combiner.zip
