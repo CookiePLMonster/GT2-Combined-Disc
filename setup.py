@@ -28,6 +28,9 @@ cur_python_version, required_python_version = sys.version_info[:3], (3, 10, 0)
 if not cur_python_version >= required_python_version:
     sys.exit(f"Your Python version {'.'.join(str(i) for i in cur_python_version)} is too old. Please update to Python {'.'.join(str(i) for i in required_python_version)} or newer.")
 
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
 args = parser.parse_args()
 interactive_mode = len(tuple(a for a in sys.argv if a not in ("-t", "--text-only"))) == 1
 gui_mode = not args.text_only
@@ -55,10 +58,7 @@ if gui_mode:
         root.withdraw()  # withdraw because root window not needed
     except Exception as e:
         gui_mode = False
-        print(f"Forcing text-only mode because of problem initializing Tkinter GUI: {e!r}", file=sys.stderr)
-
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+        eprint(f"Forcing text-only mode because of problem initializing Tkinter GUI: {e!r}")
 
 def getResourcePath(path):
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
@@ -72,13 +72,11 @@ def main():
         prompt_cli = prompt + f' ({default=}): '
         while True:
             if gui_mode:
-                filename = filedialog.asksaveasfilename(confirmoverwrite=False, initialfile=default, title=prompt, defaultextension=".bin", filetypes=(("BIN file", ".bin"), ))
+                filename = filedialog.asksaveasfilename(initialfile=default, title=prompt, defaultextension=".bin", filetypes=(("BIN file", ".bin"), ))
             else:
                 filename = getResourcePath(input(prompt_cli) or default)
             if not filename:
                 sys.exit('Setup aborted by user.')
-            elif os.path.isfile(filename):
-                print(f'{filename!r} already exists!')
             else:
                 try:
                     open(filename, 'w+').close()
