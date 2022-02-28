@@ -55,7 +55,7 @@ if gui_mode:
         root.withdraw()  # withdraw because root window not needed
     except Exception as e:
         gui_mode = False
-        print(f"Forcing text-only mode because of problem initializing Tkinter GUI: {e.__repr__()}", file=sys.stderr)
+        print(f"Forcing text-only mode because of problem initializing Tkinter GUI: {e!r}", file=sys.stderr)
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
