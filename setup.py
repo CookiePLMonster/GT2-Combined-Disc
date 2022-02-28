@@ -48,7 +48,7 @@ After paths to Arcade and Simulation discs are given, this script will unpack bo
 The setup process may take some time, so please be patient and don't close this window even if the process seems stuck.
 """)
 if gui_mode:
-    print("About to open dialogs file paths (re-run script with -t to run without dialogs).")
+    print("About to open dialogs file paths (re-run the script with -t to run without dialogs).")
     input("Press Enter to continue ...")
     try:
         root = tk.Tk()  # init Tk to make filedialog work
