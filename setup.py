@@ -33,7 +33,7 @@ def eprint(*args, **kwargs):
 
 args = parser.parse_args()
 interactive_mode = len(tuple(a for a in sys.argv if a not in ("-t", "--text-only"))) == 1
-gui_mode = not args.text_only
+gui_mode = interactive_mode and not args.text_only
 if gui_mode:
     try:
         import tkinter as tk
