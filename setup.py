@@ -357,6 +357,31 @@ def main():
             except SetupStepFailedError:
                 sys.exit(f'Failed to locate code patterns in {eboot_name}! Your game version may be unsupported.')
 
+        def stepPatchGT2PlusArcadeOverlay(path): # Semi-temporary until GT2 Plus patches the Arcade overlay on Sim Disc
+            # Only perform this step if it's GT2+ beta 6.1 for sure. Verify by checking for hashes of Arcade and GT Mode overlays
+            arcade_overlay_path = os.path.join(path, 'gt2_03.exe')
+            gtmode_overlay_path = os.path.join(path, 'gt2_05.exe')
+            try:
+                with open(arcade_overlay_path, 'rb') as f:
+                    arcade_hash = binascii.crc32(f.read()) & 0xFFFFFFFF
+                with open(gtmode_overlay_path, 'rb') as f:
+                    gtmode_hash = binascii.crc32(f.read()) & 0xFFFFFFFF
+            except OSError:
+                return
+
+            # Compare against hashes of GT2+ beta 6.1 NTSC-U, if they don't match - skip this step
+            if arcade_hash != 0x660B1AFA or gtmode_hash != 0xD5A011E1:
+                return
+
+            print('Warning: GT2 Plus beta 6.1 NTSC-U detected - patching a known issue with Peugeot 206 Rally car in the combined Arcade Mode...')
+            try:
+                with PSEXE(arcade_overlay_path, readonly=False, headless=True, baseAddress=0x80010000) as exe:
+                    # It's okay to quietly ignore failure here
+                    if peugeot_206_name := getPattern(exe, b'fp2xr\0', 3):
+                        exe.map[exe.addr(peugeot_206_name)] = 0x77 # fp2xr -> fp2wr
+            except (OSError, LookupError):
+                optionalStepFailed('Patching GT2 Plus failed!')
+
         def stepPatchMainMenuOverlay(path):
             print('Patching gt2_02.exe (main menu overlay)...')
             try:
@@ -643,6 +668,7 @@ def main():
         stepMergeXMLs(arcade_files, sim_files, output_file)
 
         stepPatchEboot(sim_files)
+        stepPatchGT2PlusArcadeOverlay(ovl_files) # Semi-temporary until GT2 Plus patches the Arcade overlay on Sim Disc
         stepPatchMainMenuOverlay(ovl_files)
         stepPatchRaceOverlay(ovl_files)
         stepReplaceVOLFiles(vol_files)
