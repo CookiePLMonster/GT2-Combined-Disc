@@ -63,6 +63,10 @@ if gui_mode:
 def getResourcePath(path):
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
 
+def unescapePath(path):
+    import shlex
+    return shlex.split(path)[0]
+
 def main():
     # Utils
     class SetupStepFailedError(ValueError):
@@ -74,7 +78,7 @@ def main():
             if gui_mode:
                 filename = filedialog.asksaveasfilename(initialfile=default, title=prompt, defaultextension=".bin", filetypes=(("BIN file", ".bin"), ))
             else:
-                filename = getResourcePath(input(prompt_cli) or default)
+                filename = getResourcePath(unescapePath(input(prompt_cli)) or default)
             if not filename:
                 sys.exit('Setup aborted by user.')
             else:
@@ -95,16 +99,15 @@ def main():
                     return filename
                 print(f'{filename!r} is not a valid file!')
         else:
-            import shlex
             while True:
                 path = ''
                 while len(path) == 0:
                     path = input(prompt + ' ')
-                display_path = shlex.split(path)[0]
-                result = getResourcePath(display_path)
+                path = unescapePath(path)
+                result = getResourcePath(path)
                 if os.path.isfile(result):
                     return result
-                print(f'{display_path!r} is not a valid file!')
+                print(f'{path!r} is not a valid file!')
 
     def getYesNoAnswer(prompt, default=None):
         # Copied from distutils.util since it's deprecated in 3.10 and will be removed in 3.12
