@@ -316,14 +316,16 @@ def main():
                     sim_identifiers = sim_data_track.find('identifiers')
                     sim_identifiers.set('modification_date', DISC_MODIFIED_TIMESTAMP)
 
-                    arcade_streams = arcade_data_track.find("./directory_tree/file[@source='STREAM.DAT']")
-                    sim_faulty = sim_data_track.find("./directory_tree/file[@source='FAULTY.PSX']")
+                    sim_directory_tree = sim_data_track.find('directory_tree')
 
-                    sim_faulty.text = arcade_streams.text
-                    sim_faulty.attrib = arcade_streams.attrib
+                    arcade_streams = arcade_data_track.find("./directory_tree/file[@source='STREAM.DAT']")
+                    sim_faulty = sim_directory_tree.find("./file[@source='FAULTY.PSX']")
 
                     # STREAMS.DAT needs an absolute path
-                    sim_faulty.set('source', os.path.join(arcade_path, sim_faulty.get('source')))
+                    arcade_streams.set('source', os.path.join(arcade_path, arcade_streams.get('source')))
+
+                    sim_directory_tree.remove(sim_faulty)
+                    sim_directory_tree.append(arcade_streams)
 
                 sim_tree.write(sim_xml)
             except ET.ParseError as e:
