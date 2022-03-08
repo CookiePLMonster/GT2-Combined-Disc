@@ -24,7 +24,7 @@ parser.add_argument('-f', '--no-fmvs', dest='no_fmvs', action='store_true', help
 parser.add_argument('-e', '--ignore-errors', dest='ignore_errors', action='store_true', help='ignore non-critical errors encountered during setup. Critical errors are never ignored')
 parser.add_argument('-t', '--text-only', dest='text_only', action='store_true', help='Do not use native filepicker windows.')
 
-cur_python_version, required_python_version = sys.version_info[:3], (3, 10, 0)
+cur_python_version, required_python_version = sys.version_info[:3], (3, 8, 0)
 if not cur_python_version >= required_python_version:
     sys.exit(f"Your Python version {'.'.join(str(i) for i in cur_python_version)} is too old. Please update to Python {'.'.join(str(i) for i in required_python_version)} or newer.")
 
@@ -221,7 +221,10 @@ def main():
         no_fmvs = args.no_fmvs
         output_file = args.output_file
 
-    with tempfile.TemporaryDirectory(prefix='gt2combined-', ignore_cleanup_errors=True) as temp_dir:
+    kwargs = {}
+    if cur_python_version >= (3, 10, 0):
+        kwargs['ignore_cleanup_errors'] = True
+    with tempfile.TemporaryDirectory(prefix='gt2combined-', **kwargs) as temp_dir:
 
         # Installation steps
         def stepUnpackDiscs():
@@ -349,7 +352,13 @@ def main():
                     for line in f:
                         key, value = line.split('=', 1)
                         cnf[key.strip()] = value.strip()
-                eboot_name = cnf['BOOT'].removeprefix('cdrom:\\').rsplit(';', 1)[0]
+
+                def removeprefix(string, prefix):
+                    if prefix and string.startswith(prefix):
+                        return string[len(prefix):]
+                    return string
+
+                eboot_name = removeprefix(cnf['BOOT'], 'cdrom:\\').rsplit(';', 1)[0]
                 with PSEXE(os.path.join(path, eboot_name), readonly=False) as exe:
                     # Replace li $a0, 1 with 5li $a0, 5 in sub_8005D6E0 to re-enable intro videos
                     if immediate := getPattern(exe, rb'\x00\x00\x00\x00.{4}\x01\x00\x04\x24\x10\x00\xBF\x8F', 8): # Pointer to \x01

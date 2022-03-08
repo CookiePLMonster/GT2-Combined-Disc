@@ -6,7 +6,7 @@ This modification combines both discs for an ultimate and complete version of Gr
 
 Due to the nature of this mod, the setup process is slightly more involved than the usual:
 1. Download the setup script.
-2. Install **Python 3.10.0** or newer. If you don't have it installed yet, you may get it from the Microsoft Store.
+2. Install **Python 3.8.0** or newer. If you don't have it installed yet, you may get it from the Microsoft Store.
 3. Run `setup.py` by double-clicking it like any other executable file. If due to your local setup the script does not run,
 launch it with `python setup.py` or `python3 setup.py` in the Command Prompt.
 4. Follow the on-screen instructions. Remember that you may easily "type" the full path to the file by dragging it to the command line window.
