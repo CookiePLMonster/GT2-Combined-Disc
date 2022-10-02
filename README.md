@@ -20,7 +20,7 @@ The modification is compatible with all game versions, **except for NTSC-J v1.0*
 
 ## Hardware compatibility
 * PSP/PS Vita can use the full version of the mod in PBP format.
-* On PS1, the full version is compatible with [XStation](https://castlemaniagames.com/products/xstation).
+* On PS1, the full version is compatible with [XStation](https://castlemaniagames.com/products/xstation) and [PSIO](https://ps-io.com/).
   You should opt for the lightweight version (without FMVs) **only** if burning the image on a physical CD.
 
 [![Preview](http://img.youtube.com/vi/jByvSCDQLdY/0.jpg)](http://www.youtube.com/watch?v=jByvSCDQLdY "Preview")
